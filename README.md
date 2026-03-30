@@ -19,7 +19,7 @@ sudo bash arch-setup.sh
 ```
 ## Firewall
 
-An independent script (`setup_firewall.sh`) configures `firewalld` for the `home` zone with the following:
+An independent script (`setup_firewall.sh`) configures and installs `firewalld` for the `home` zone with the following:
 
 - **Services:** `dhcpv6-client`, `ipp`, `mdns`, `samba-client`, `ssh`
 - **Custom ports:** 9942, 9944, 9945 (TCP & UDP)
