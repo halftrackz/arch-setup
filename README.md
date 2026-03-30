@@ -30,7 +30,7 @@ An independent script (`setup_firewall.sh`) configures and installs `firewalld` 
 sudo bash setup_firewall.sh
 ```
 
-> Does not require firewalld to be installed, but does require you to be on your home network for proper configuration.
+> Does not require firewalld to be installed manually, but does require you to be on your home network for proper configuration.
 
 ## Notes
 
