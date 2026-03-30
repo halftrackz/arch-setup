@@ -2,6 +2,7 @@
 set -e
 # Firewall setup script - home zone configuration
 # Generated from firewall-cmd output
+
 # Install and start firewalld if not present
 if ! command -v firewall-cmd &>/dev/null; then
     pacman -S --noconfirm firewalld
@@ -48,6 +49,11 @@ done
 firewall-cmd --permanent --zone=$ZONE --set-target=default
 firewall-cmd --permanent --zone=$ZONE --remove-icmp-block-inversion 2>/dev/null || true
 firewall-cmd --permanent --zone=$ZONE --add-forward
+
+# ── Assign active interface to home zone ──────────────────────────────────────
+IFACE=$(ip route get 1.1.1.1 | awk '{print $5; exit}')
+echo "Assigning interface $IFACE to zone: $ZONE"
+firewall-cmd --permanent --zone=$ZONE --add-interface=$IFACE
 
 # ── Reload to apply ───────────────────────────────────────────────────────────
 firewall-cmd --reload
