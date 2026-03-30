@@ -16,25 +16,18 @@ A root-level bash script that automates common post-installation tasks on a fres
 
 ## Firewall
 
-A companion script (`setup_firewall_home.sh`) configures `firewalld` for the `home` zone with the following:
+An independent script (`setup_firewall_home.sh`) configures `firewalld` for the `home` zone with the following:
 
 - **Services:** `dhcpv6-client`, `ipp`, `mdns`, `samba-client`, `ssh`
 - **Custom ports:** 9942, 9944, 9945 (TCP & UDP)
 - **Steam/game ports:** TCP 27014–27050, UDP 27000–27100
 
-Run it after the main setup:
 
 ```bash
 sudo bash setup_firewall_home.sh
 ```
 
-> Requires `firewalld` to be installed and running (`systemctl enable --now firewalld`).
-
-## Usage
-
-```bash
-sudo bash arch-setup.sh
-```
+> Does not require firewalld to be installed, but does require you to be on your home network for proper configuration.
 
 ## Notes
 
