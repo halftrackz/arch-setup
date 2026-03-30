@@ -13,10 +13,13 @@ A root-level bash script that automates common post-installation tasks on a fres
 - **Installs browsers** — Chromium via pacman, Brave via AUR
 - **Bluetooth** — Installs and enables bluez
 - **Reboot prompt** — Asks before rebooting rather than forcing it
-
+## Usage
+```bash
+sudo bash arch-setup.sh
+```
 ## Firewall
 
-An independent script (`setup_firewall_home.sh`) configures `firewalld` for the `home` zone with the following:
+An independent script (`setup_firewall.sh`) configures `firewalld` for the `home` zone with the following:
 
 - **Services:** `dhcpv6-client`, `ipp`, `mdns`, `samba-client`, `ssh`
 - **Custom ports:** 9942, 9944, 9945 (TCP & UDP)
@@ -24,7 +27,7 @@ An independent script (`setup_firewall_home.sh`) configures `firewalld` for the 
 
 
 ```bash
-sudo bash setup_firewall_home.sh
+sudo bash setup_firewall.sh
 ```
 
 > Does not require firewalld to be installed, but does require you to be on your home network for proper configuration.
