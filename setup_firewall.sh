@@ -1,8 +1,18 @@
 #!/bin/bash
+set -e
 # Firewall setup script - home zone configuration
 # Generated from firewall-cmd output
+# Install and start firewalld if not present
+if ! command -v firewall-cmd &>/dev/null; then
+    pacman -S --noconfirm firewalld
+fi
 
-set -e
+systemctl enable --now firewalld
+
+# Wait until firewalld is ready
+until firewall-cmd --state &>/dev/null; do
+    sleep 1
+done
 
 ZONE="home"
 
