@@ -31,7 +31,7 @@ sed -i 's/^# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/%wheel ALL=(ALL:ALL) NOPASSWD: A
 # 3. Install KDE Plasma, flatpak + apps
 pacman -S --noconfirm plasma-meta kde-gtk-config breeze-gtk \
     konsole nemo kate gwenview okular mpv ark elisa flatpak \
-    steam kdeconnect kcalc discord sddm
+    steam kdeconnect kcalc discord sddm nano
 systemctl enable sddm
 # Add repos to flatpak
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
