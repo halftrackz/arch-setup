@@ -37,7 +37,7 @@ systemctl enable sddm
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
 # 4. Install PipeWire (enable for user after first login via linger)
-pacman -S --noconfirm pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber
+pacman -S --noconfirm pipewire pipewire-pulse pipewire-alsa wireplumber
 loginctl enable-linger "$username"
 # Services will auto-start on first login via socket activation.
 # To enable them explicitly for the user session:
