@@ -28,11 +28,13 @@ echo "Set password for $username:"
 passwd "$username"
 sed -i 's/^# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/%wheel ALL=(ALL:ALL) NOPASSWD: ALL/' /etc/sudoers
 
-# 3. Install KDE Plasma + apps
+# 3. Install KDE Plasma, flatpak + apps
 pacman -S --noconfirm plasma-meta kde-gtk-config breeze-gtk \
-    konsole nemo kate gwenview okular mpv ark elisa \
+    konsole nemo kate gwenview okular mpv ark elisa flatpak \
     steam kdeconnect kcalc discord sddm
 systemctl enable sddm
+# Add repos to flatpak
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
 # 4. Install PipeWire (enable for user after first login via linger)
 pacman -S --noconfirm pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber
