@@ -7,7 +7,7 @@ A root-level bash script that automates common post-installation tasks on a fres
 - **Enables multilib** — Safely adds or uncomments the multilib repository in `pacman.conf` for 32-bit package support
 - **Creates a user** — Sets up a new user with wheel group membership and passwordless sudo
 - **Installs KDE Plasma** — Full Plasma desktop with a curated set of apps including Steam, Discord, and KDE Connect
-- **Installs flatpak** — Adds Flatpak with the Flathub repository pre-configured and ready to use after reboot
+- **Installs Flatpak** — Adds Flatpak with the Flathub repository pre-configured and ready to use after reboot
 - **Configures PipeWire** — Installs and enables PipeWire, PulseAudio compatibility, JACK, and WirePlumber via linger
 - **GPU drivers** — Prompts for NVIDIA or AMD, with hybrid laptop detection for NVIDIA (installs `nvidia-prime`), Nouveau blacklisting, and Wayland DRM modeset configuration
 - **Installs yay** — Builds the AUR helper from source correctly as a non-root user
