@@ -34,15 +34,16 @@ if [[ "$alvr" =~ ^[Yy]$ ]]; then
     done
 fi
 
-# ── Steam/Game TCP ports (27014-27050) ────────────────────────────────────────
-for port in $(seq 27014 27050); do
-    firewall-cmd --permanent --zone=$ZONE --add-port="${port}/tcp"
-done
-
-# ── Steam/Game UDP ports (27000-27100) ────────────────────────────────────────
-for port in $(seq 27000 27100); do
-    firewall-cmd --permanent --zone=$ZONE --add-port="${port}/udp"
-done
+# ── Steam/Game ports ──────────────────────────────────────────────────────────
+read -rp "Are you running Steam dedicated game servers? (y/N): " steam
+if [[ "$steam" =~ ^[Yy]$ ]]; then
+    for port in $(seq 27014 27050); do
+        firewall-cmd --permanent --zone=$ZONE --add-port="${port}/tcp"
+    done
+    for port in $(seq 27000 27100); do
+        firewall-cmd --permanent --zone=$ZONE --add-port="${port}/udp"
+    done
+fi
 
 # ── Zone settings ─────────────────────────────────────────────────────────────
 firewall-cmd --permanent --zone=$ZONE --set-target=default
