@@ -23,8 +23,8 @@ sudo bash arch-setup.sh
 An independent script (`setup_firewall.sh`) configures and installs `firewalld` for the `home` zone with the following:
 
 - **Services:** `dhcpv6-client`, `ipp`, `mdns`, `samba-client`, `ssh`
-- **Custom ports:** 9942, 9944, 9945 (TCP & UDP)
-- **Steam/game ports:** TCP 27014–27050, UDP 27000–27100
+- **Optional — ALVR:** 9942, 9944, 9945 (TCP & UDP)
+- **Optional — Steam dedicated servers:** TCP 27014–27050, UDP 27000–27100
 
 
 ```bash
