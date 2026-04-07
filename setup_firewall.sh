@@ -25,15 +25,14 @@ for svc in "${SERVICES[@]}"; do
     firewall-cmd --permanent --zone=$ZONE --add-service="$svc"
 done
 
-# ── Custom TCP ports (9942-9945) ───────────────────────────────────────────────
-for port in 9942 9944 9945; do
-    firewall-cmd --permanent --zone=$ZONE --add-port="${port}/tcp"
-done
-
-# ── Custom UDP ports (9942-9945) ───────────────────────────────────────────────
-for port in 9942 9944 9945; do
-    firewall-cmd --permanent --zone=$ZONE --add-port="${port}/udp"
-done
+# ── Custom ports (ALVR) ───────────────────────────────────────────────────────
+read -rp "Are you using ALVR? (y/N): " alvr
+if [[ "$alvr" =~ ^[Yy]$ ]]; then
+    for port in 9942 9944 9945; do
+        firewall-cmd --permanent --zone=$ZONE --add-port="${port}/tcp"
+        firewall-cmd --permanent --zone=$ZONE --add-port="${port}/udp"
+    done
+fi
 
 # ── Steam/Game TCP ports (27014-27050) ────────────────────────────────────────
 for port in $(seq 27014 27050); do
