@@ -35,7 +35,7 @@ sudo bash setup_firewall.sh
 
 ## Notes
 
-- Must be run as root on a fresh Arch install with GRUB as the bootloader
+- Must be run as root on a fresh Arch install with GRUB as the bootloader (arch-setup.sh only)
 - `setup_firewall.sh` can be run independently on any existing Arch install
 - NVIDIA support targets the stock `linux` kernel via `nvidia-open`
 - If you use `linux-lts` or `linux-zen`, swap `nvidia-open` for `nvidia-open-dkms`
