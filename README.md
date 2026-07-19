@@ -18,12 +18,17 @@ A root-level bash script that automates common post-installation tasks on a fres
 ```bash
 chmod +x arch-setup.sh
 ```
+then
 ```bash
 sudo ./arch-setup.sh
 ```
 OR for password sudo
 ```bash
 sudo chmod +x arch-setup-pswd.sh
+```
+then
+```bash
+sudo ./arch-setup-pswd.sh
 ```
 ## Firewall
 
