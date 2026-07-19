@@ -16,7 +16,14 @@ A root-level bash script that automates common post-installation tasks on a fres
 - **Reboot prompt** — Asks before rebooting rather than forcing it
 ## Usage
 ```bash
-sudo bash arch-setup.sh
+chmod +x arch-setup.sh
+```
+```bash
+sudo ./arch-setup.sh
+```
+OR for password sudo
+```bash
+sudo chmod +x arch-setup-pswd.sh
 ```
 ## Firewall
 
