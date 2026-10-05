@@ -34,19 +34,18 @@ if [[ "${jelly,,}" == "y"* ]]; then
     firewall-cmd --permanent --zone="$ZONE" --add-port=7359/udp
 fi
 
-# ── Primary Minecraft Server ──────────────────────────────────────────────────
+# ── Minecraft Servers ─────────────────────────────────────────────────────────
 read -rp "Is this a Minecraft server? (y/N): " mc
 if [[ "${mc,,}" == "y"* ]]; then
     echo "Opening primary Minecraft ports (25565/tcp, 19132/udp)..."
     firewall-cmd --permanent --zone="$ZONE" --add-port=25565/tcp
     firewall-cmd --permanent --zone="$ZONE" --add-port=19132/udp
-fi
 
-# ── Secondary Minecraft Server ────────────────────────────────────────────────
-read -rp "Are you running a 2nd Minecraft server? (y/N): " mc2
-if [[ "${mc2,,}" == "y"* ]]; then
-    echo "Opening secondary Minecraft server port (25566/tcp)..."
-    firewall-cmd --permanent --zone="$ZONE" --add-port=25566/tcp
+    read -rp "Are you running a 2nd Minecraft server on this machine? (y/N): " mc2
+    if [[ "${mc2,,}" == "y"* ]]; then
+        echo "Opening secondary Minecraft server port (25566/tcp)..."
+        firewall-cmd --permanent --zone="$ZONE" --add-port=25566/tcp
+    fi
 fi
 
 # ── Sunshine Desktop Streaming ────────────────────────────────────────────────
