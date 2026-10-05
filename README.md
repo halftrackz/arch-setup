@@ -46,7 +46,9 @@ sudo bash setup_firewall.sh
 
 > Does not require firewalld to be installed manually, but does require you to be on your home network for proper configuration.
 
-## Notes
+## Nightly Updater
+
+place holder because I'm tired, will add documentation tmrw
 
 ## Notes
 - Must be run as root on a fresh Arch install with GRUB as the bootloader — `arch-setup.sh` only
