@@ -15,6 +15,7 @@ A root-level bash script that automates common post-installation tasks on a fres
 - **Bluetooth** — Installs and enables bluez
 - **Reboot prompt** — Asks before rebooting rather than forcing it
 ## Usage
+for password less sudo:
 ```bash
 chmod +x arch-setup.sh
 ```
