@@ -48,7 +48,7 @@ sudo bash setup_firewall.sh
 
 ## Nightly Updater
 
-place holder because I'm tired, will add documentation tmrw
+place holder - will NOT be added until i feel like it lol
 
 ## Notes
 - Must be run as root on a fresh Arch install with GRUB as the bootloader — `arch-setup.sh` only
