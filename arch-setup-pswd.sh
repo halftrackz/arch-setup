@@ -28,6 +28,9 @@ echo "Set password for $username:"
 passwd "$username"
 sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 
+# Temporarily allow wheel group passwordless sudo for automated AUR/makepkg builds
+echo "%wheel ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/99-temporary-nopasswd
+
 # 3. Install KDE Plasma, flatpak + apps
 pacman -S --noconfirm plasma-meta kde-gtk-config breeze-gtk \
     konsole nemo kate gwenview okular mpv ark elisa flatpak \
@@ -39,8 +42,6 @@ flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flat
 # 4. Install PipeWire (enable for user after first login via linger)
 pacman -S --noconfirm pipewire pipewire-pulse pipewire-alsa wireplumber
 loginctl enable-linger "$username"
-# Services will auto-start on first login via socket activation.
-# To enable them explicitly for the user session:
 su - "$username" -c "
     export XDG_RUNTIME_DIR=/run/user/$(id -u $username)
     systemctl --user enable pipewire pipewire-pulse wireplumber
@@ -79,6 +80,7 @@ elif [[ "$gpu" =~ ^[Aa]md$ ]]; then
         vulkan-radeon lib32-mesa lib32-vulkan-radeon
 else
     echo "Invalid GPU selection. Exiting."
+    rm -f /etc/sudoers.d/99-temporary-nopasswd
     exit 1
 fi
 
@@ -97,6 +99,9 @@ su - "$username" -c "yay -S --noconfirm brave-bin"
 # 8. Bluetooth support
 pacman -S --noconfirm bluez bluez-utils
 systemctl enable --now bluetooth
+
+# Clean up temporary passwordless sudo rule
+rm -f /etc/sudoers.d/99-temporary-nopasswd
 
 read -rp "Setup complete! Reboot now? [y/N]: " reboot_now
 if [[ "$reboot_now" =~ ^[Yy]$ ]]; then
