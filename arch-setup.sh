@@ -22,7 +22,7 @@ else
 fi
 pacman -Syu --noconfirm
 
-# 2. Add user and enable sudo
+# 2. Add user and enable passwordless sudo
 useradd -m -G wheel -s /bin/bash "$username"
 echo "Set password for $username:"
 passwd "$username"
@@ -64,6 +64,45 @@ blacklist nouveau
 options nouveau modeset=0
 EOF
 
+    # Bootloader Check & GRUB Switch Logic
+    if [[ ! -f /etc/default/grub ]]; then
+        echo "GRUB bootloader not detected."
+        
+        old_bl="unknown"
+        if bootctl status &>/dev/null || [[ -d /boot/loader ]] || [[ -d /efi/loader ]]; then
+            old_bl="systemd-boot"
+            echo "Detected old bootloader: systemd-boot"
+        else
+            echo "Couldn't find old bootloader."
+        fi
+
+        read -rp "Would you like to switch to GRUB? [y/N]: " switch_grub
+        if [[ "$switch_grub" =~ ^[Yy]$ ]]; then
+            echo "Switching to GRUB..."
+            
+            if [[ "$old_bl" == "systemd-boot" ]]; then
+                echo "Removing systemd-boot..."
+                bootctl remove 2>/dev/null || rm -rf /boot/EFI/systemd /boot/loader /efi/EFI/systemd /efi/loader /boot/efi/EFI/systemd /boot/efi/loader
+            fi
+
+            pacman -S --noconfirm grub efibootmgr
+            
+            efi_mount="/boot"
+            if mountpoint -q /boot/efi; then
+                efi_mount="/boot/efi"
+            elif mountpoint -q /efi; then
+                efi_mount="/efi"
+            fi
+
+            grub-install --target=x86_64-efi --efi-directory="$efi_mount" --bootloader-id=GRUB
+            mkdir -p /boot/grub
+            grub-mkconfig -o /boot/grub/grub.cfg
+        else
+            echo "User declined switching to GRUB. Exiting."
+            exit 1
+        fi
+    fi
+
     # Enable NVIDIA DRM modeset for Wayland
     sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="\1 nvidia-drm.modeset=1"/' /etc/default/grub
 
@@ -75,8 +114,7 @@ EOF
     pacman -S --noconfirm vulkan-icd-loader lib32-vulkan-icd-loader
 
 elif [[ "$gpu" =~ ^[Aa]md$ ]]; then
-    pacman -S --noconfirm xf86-video-amdgpu mesa mesa-vdpau \
-        vulkan-radeon lib32-mesa lib32-vulkan-radeon
+    pacman -S --noconfirm mesa mesa-vdpau vulkan-radeon lib32-mesa lib32-vulkan-radeon
 else
     echo "Invalid GPU selection. Exiting."
     exit 1
