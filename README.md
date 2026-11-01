@@ -50,6 +50,10 @@ sudo bash setup_firewall.sh
 
 place holder - will NOT be added until i feel like it lol
 
+## Grub Script
+
+Another place holder, but short explanation of what the script does, if you are on systemmd, it switches you to grub, if you are on grub it asks if you want OS-Prober and EFIBOOTNEXT entries
+
 ## Notes
 - Must be run as root on a fresh Arch install with GRUB as the bootloader — `arch-setup.sh` only
 - `setup_firewall.sh` can be run independently on any existing Arch install
