@@ -1,5 +1,5 @@
 #!/bin/bash
-# Arch Linux post-install setup script
+# Arch Linux post-install setup script (Password-protected sudo version)
 # Must be run as root
 
 set -euo pipefail
@@ -28,7 +28,7 @@ else
 fi
 pacman -Syu --noconfirm
 
-# 2. Add user and enable sudo
+# 2. Add user and enable password-protected sudo
 useradd -m -G wheel -s /bin/bash "$username"
 echo "Set password for $username:"
 passwd "$username"
@@ -109,11 +109,14 @@ EOF
         fi
     fi
 
-    # Enable NVIDIA DRM modeset for Wayland via GRUB
+    # Enable NVIDIA DRM modeset for Wayland
     sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="\1 nvidia-drm.modeset=1"/' /etc/default/grub
+
+    # Rebuild GRUB and initramfs
     grub-mkconfig -o /boot/grub/grub.cfg
     mkinitcpio -P
 
+    # Vulkan for NVIDIA
     pacman -S --noconfirm vulkan-icd-loader lib32-vulkan-icd-loader
 
 elif [[ "$gpu" =~ ^[Aa]md$ ]]; then
@@ -123,7 +126,7 @@ else
     exit 1
 fi
 
-# 6. Install yay (built as non-root with temp nopasswd)
+# 6. Install yay (built as non-root using temp nopasswd rule)
 pacman -S --needed --noconfirm base-devel git
 BUILD_DIR="$(mktemp -d)"
 git clone https://aur.archlinux.org/yay-git.git "$BUILD_DIR/yay-git"
@@ -139,7 +142,34 @@ su - "$username" -c "yay -S --noconfirm brave-bin"
 pacman -S --noconfirm bluez bluez-utils
 systemctl enable --now bluetooth
 
-# Explicit cleanup before success
+# 9. Optional GRUB Tweaks (BootNext & OS Prober)
+if [[ -f /etc/default/grub ]]; then
+    grub_updated=false
+
+    read -rp "Do you want to disable EFI BootNext entries from showing in the GRUB menu? [y/N]: " disable_bootnext
+    if [[ "$disable_bootnext" =~ ^[Yy]$ ]]; then
+        echo "GRUB_DISABLE_BOOTNEXT=true" >> /etc/default/grub
+        grub_updated=true
+    fi
+
+    read -rp "Do you want to enable os-prober to detect other operating systems (like Windows)? [y/N]: " enable_osprober
+    if [[ "$enable_osprober" =~ ^[Yy]$ ]]; then
+        pacman -S --noconfirm os-prober
+        if grep -q "^#*GRUB_DISABLE_OS_PROBER" /etc/default/grub; then
+            sed -i 's/^#*GRUB_DISABLE_OS_PROBER=.*/GRUB_DISABLE_OS_PROBER=false/' /etc/default/grub
+        else
+            echo "GRUB_DISABLE_OS_PROBER=false" >> /etc/default/grub
+        fi
+        grub_updated=true
+    fi
+
+    if [[ "$grub_updated" == "true" ]]; then
+        grub-mkconfig -o /boot/grub/grub.cfg
+        echo "GRUB configuration updated."
+    fi
+fi
+
+# Clean up temporary passwordless sudo rule before completion
 rm -f /etc/sudoers.d/99-temporary-nopasswd
 trap - EXIT
 
