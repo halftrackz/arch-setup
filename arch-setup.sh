@@ -39,8 +39,6 @@ flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flat
 # 4. Install PipeWire (enable for user after first login via linger)
 pacman -S --noconfirm pipewire pipewire-pulse pipewire-alsa wireplumber
 loginctl enable-linger "$username"
-# Services will auto-start on first login via socket activation.
-# To enable them explicitly for the user session:
 su - "$username" -c "
     export XDG_RUNTIME_DIR=/run/user/$(id -u $username)
     systemctl --user enable pipewire pipewire-pulse wireplumber
@@ -135,6 +133,33 @@ su - "$username" -c "yay -S --noconfirm brave-bin"
 # 8. Bluetooth support
 pacman -S --noconfirm bluez bluez-utils
 systemctl enable --now bluetooth
+
+# 9. Optional GRUB Tweaks (BootNext & OS Prober)
+if [[ -f /etc/default/grub ]]; then
+    grub_updated=false
+
+    read -rp "Do you want to disable EFI BootNext entries from showing in the GRUB menu? [y/N]: " disable_bootnext
+    if [[ "$disable_bootnext" =~ ^[Yy]$ ]]; then
+        echo "GRUB_DISABLE_BOOTNEXT=true" >> /etc/default/grub
+        grub_updated=true
+    fi
+
+    read -rp "Do you want to enable os-prober to detect other operating systems (like Windows)? [y/N]: " enable_osprober
+    if [[ "$enable_osprober" =~ ^[Yy]$ ]]; then
+        pacman -S --noconfirm os-prober
+        if grep -q "^#*GRUB_DISABLE_OS_PROBER" /etc/default/grub; then
+            sed -i 's/^#*GRUB_DISABLE_OS_PROBER=.*/GRUB_DISABLE_OS_PROBER=false/' /etc/default/grub
+        else
+            echo "GRUB_DISABLE_OS_PROBER=false" >> /etc/default/grub
+        fi
+        grub_updated=true
+    fi
+
+    if [[ "$grub_updated" == "true" ]]; then
+        grub-mkconfig -o /boot/grub/grub.cfg
+        echo "GRUB configuration updated."
+    fi
+fi
 
 read -rp "Setup complete! Reboot now? [y/N]: " reboot_now
 if [[ "$reboot_now" =~ ^[Yy]$ ]]; then
