@@ -1,75 +1,74 @@
-#!/usr/bin/env bash
-# ==============================================================================
-# Setup & Enforcer Script: Fortnite / Easy Anti-Cheat V2 on Linux
-# ==============================================================================
-# Key Objectives & Logic:
-# - Enforces Secure Boot and TPM enablement for Easy Anti-Cheat V2 / Fortnite.
-# - Directly signs and registers critical boot files using 'sbctl sign -s'.
-# - Relies entirely on sbctl's native output for any errors.
-# ==============================================================================
+#!/bin/bash
 
-set -euo pipefail
+# Exit immediately if a command exits with a non-zero status
+set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[OK]${NC} $1"; }
-log_warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
-log_error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
-
-if [[ $EUID -ne 0 ]]; then
-   log_error "This script must be run as root to sign boot binaries."
+# Ensure script is run as root
+if [ "$EUID" -ne 0 ]; then
+  echo "[-] Please run this script with sudo or as root."
+  exit 1
 fi
 
-echo "======================================================================"
-echo "    Fortnite / Easy Anti-Cheat V2 Linux Readiness & Kernel Enforcer   "
-echo "======================================================================"
+echo "[+] Step 1: Unlocking EFI variables (clearing immutable flags if present)..."
+chattr -i /sys/firmware/efi/efivars/PK-* 2>/dev/null || true
+chattr -i /sys/firmware/efi/efivars/KEK-* 2>/dev/null || true
+chattr -i /sys/firmware/efi/efivars/db-* 2>/dev/null || true
 
-# 1. Hardware & Tool Validation
-log_info "Checking TPM 2.0 hardware presence..."
-if [[ -c /dev/tpmrm0 || -c /dev/tpm0 ]]; then
-    log_success "TPM 2.0 device detected."
+echo "[+] Step 2: Checking Secure Boot Setup Mode state..."
+SB_STATUS=$(sbctl status | grep "Setup Mode" | awk '{print $3}')
+
+if [ "$SB_STATUS" = "Disabled" ] || [ "$SB_STATUS" = "false" ]; then
+  echo "[-] ERROR: Setup Mode is currently disabled in your motherboard's NVRAM."
+  echo "[-] To enroll keys, you must reboot into your BIOS, navigate to Secure Boot,"
+  echo "[-] and choose the option to reset/clear Secure Boot keys to enter 'Setup Mode'."
+  echo "[-] Once you boot back into Arch in Setup Mode, re-run this script."
+  exit 1
 else
-    log_error "TPM device not found (/dev/tpmrm0 or /dev/tpm0 missing). Enable TPM in UEFI/BIOS."
+  echo "[+] Setup Mode is verified as Enabled. Proceeding with key enrollment..."
 fi
 
-log_info "Verifying Secure Boot tools..."
-command -v sbctl &>/dev/null || pacman -S --needed --noconfirm sbctl
+echo "[+] Step 3: Creating and enrolling custom Secure Boot keys..."
+sbctl create-keys
+sbctl enroll-keys
 
-# 2. Key Management (Handled natively by sbctl)
-log_info "Ensuring sbctl keys are created and synced..."
-if ! sbctl status --json 2>/dev/null | grep -q '"installed":true'; then
-    sbctl create-keys
-fi
-sbctl enroll-keys -m -f
+echo "[+] Step 4: Ensuring all boot binaries and kernels are signed..."
+sbctl sign -s /boot/EFI/GRUB/grubx64.efi
+sbctl sign -s /boot/grub/x86_64-efi/core.efi
+sbctl sign -s /boot/grub/x86_64-efi/grub.efi
+sbctl sign -s /boot/vmlinuz-linux
 
-# 3. Direct File Signing and Database Registration (-s flag)
-log_info "Signing and registering core boot binaries..."
+# --- Alternative / Separate Custom Kernels (Uncomment when installed) ---
+# CachyOS Kernel:
+# sbctl sign -s /boot/vmlinuz-linux-cachyos
+#
+# SteamOS / Valve custom kernel build:
+# sbctl sign -s /boot/vmlinuz-linux-neptune
+#
+# Separate custom kernel package (e.g., linux-eac or custom builds):
+# sbctl sign -s /boot/vmlinuz-linux-eac
 
-CRITICAL_TARGETS=(
-    "/boot/vmlinuz-linux"
-    "/boot/EFI/BOOT/BOOTX64.EFI"
-    "/boot/EFI/GRUB/grubx64.efi"
-    "/boot/grub/x86_64-efi/core.efi"
-    "/boot/grub/x86_64-efi/grub.efi"
-)
+echo "[+] Step 5: Creating automatic pacman post-transaction hook..."
+mkdir -p /etc/pacman.d/hooks
 
-for target in "${CRITICAL_TARGETS[@]}"; do
-    if [[ -f "$target" ]]; then
-        sbctl sign -s "$target"
-        log_success "Signed and registered: $target"
-    else
-        log_warn "Target not found, skipping: $target"
-    fi
-done
+cat << 'EOF' > /etc/pacman.d/hooks/sbctl.hook
+[Trigger]
+Operation = Upgrade
+Type = Package
+Target = linux
+Target = grub
+# Target = linux-cachyos
+# Target = linux-neptune
+# Target = linux-eac
+# Note: Add target here if using a separate custom kernel package or if Arch maintainers provide an auto-hook package in the future
 
-# 4. Verification Check
-log_info "Running final sbctl verification..."
+[Action]
+Description = Automatically signing EFI binaries for Secure Boot...
+When = PostTransaction
+Exec = /usr/bin/sbctl sign-all
+EOF
+
+echo "[+] Step 6: Verifying final sbctl database status..."
 sbctl verify
 
-echo ""
-log_success "Script execution complete! All binaries are signed and registered."
+echo "[SUCCESS] Secure Boot configuration and automated signing hooks are fully set up!"
+echo "I went through hours of troubleshooting for this, your welcome so y'all can have automatic signed stuff whenever epic drops it."
