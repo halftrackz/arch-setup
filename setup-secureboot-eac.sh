@@ -4,8 +4,8 @@
 # ==============================================================================
 # Key Objectives & Logic:
 # - Enforces Secure Boot and TPM enablement for Easy Anti-Cheat V2 / Fortnite.
-# - Enrolls sbctl keys and ensures hardware NVRAM sync (-m -f) to stop violations.
-# - Directly registers and signs critical boot files using 'sbctl sign -s'.
+# - Directly signs and registers critical boot files using 'sbctl sign -s'.
+# - Relies entirely on sbctl's native output for any errors.
 # ==============================================================================
 
 set -euo pipefail
@@ -40,24 +40,12 @@ fi
 log_info "Verifying Secure Boot tools..."
 command -v sbctl &>/dev/null || pacman -S --needed --noconfirm sbctl
 
-# 2. Key Enrollment & NVRAM Enforcement (Fixes Secure Boot Violation)
-log_info "Checking Secure Boot key enrollment status..."
+# 2. Key Management (Handled natively by sbctl)
+log_info "Ensuring sbctl keys are created and synced..."
 if ! sbctl status --json 2>/dev/null | grep -q '"installed":true'; then
-    log_warn "sbctl keys are not fully enrolled in firmware NVRAM."
-    if sbctl status 2>/dev/null | grep -q "Setup Mode:.*Enabled"; then
-        log_info "System is in Setup Mode. Creating and enrolling keys..."
-        sbctl create-keys
-        # Enrolls custom keys + Microsoft certs + forces firmware sync to prevent boot blocks
-        sbctl enroll-keys -m -f
-        log_success "Secure Boot custom keys successfully enrolled into NVRAM!"
-    else
-        log_error "Motherboard is NOT in Setup Mode. Go to BIOS, clear/reset keys to enter Setup Mode, and rerun."
-    fi
-else
-    log_success "sbctl keys are already active and enrolled."
-    # Ensure keys are forced-synced to avoid signature mismatches
-    sbctl enroll-keys -m -f --skip-cert-check &>/dev/null || true
+    sbctl create-keys
 fi
+sbctl enroll-keys -m -f
 
 # 3. Direct File Signing and Database Registration (-s flag)
 log_info "Signing and registering core boot binaries..."
@@ -84,4 +72,4 @@ log_info "Running final sbctl verification..."
 sbctl verify
 
 echo ""
-log_success "Script execution complete! All binaries are signed, enrolled, and locked in."
+log_success "Script execution complete! All binaries are signed and registered."
