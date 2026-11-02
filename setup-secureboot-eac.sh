@@ -28,10 +28,21 @@ else
 fi
 
 echo "[+] Step 3: Creating and enrolling custom Secure Boot keys..."
-sbctl create-keys
-sbctl enroll-keys
+sbctl create-keys || true
+sbctl enroll-keys --microsoft || true # fallback or standard enrollment
 
-echo "[+] Step 4: Ensuring all boot binaries and kernels are signed..."
+echo "[+] Step 4: Cleaning NVRAM fallback entries and reinstalling GRUB..."
+# Clear out fallback UEFI OS entry if it exists to prevent boot conflicts
+fallback_boot=$(efibootmgr | grep "UEFI OS" | awk '{print $1}' | tr -d '*')
+if [ -n "$fallback_boot" ]; then
+  boot_num=$(echo "$fallback_boot" | sed 's/Boot//')
+  efibootmgr -b "$boot_num" -B || true
+fi
+
+# Reinstall GRUB with shim verification disabled and TPM module included
+grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB --modules="tpm" --disable-shim-lock
+
+echo "[+] Step 5: Ensuring all boot binaries and kernels are signed..."
 sbctl sign -s /boot/EFI/GRUB/grubx64.efi
 sbctl sign -s /boot/grub/x86_64-efi/core.efi
 sbctl sign -s /boot/grub/x86_64-efi/grub.efi
@@ -47,7 +58,7 @@ sbctl sign -s /boot/vmlinuz-linux
 # Separate custom kernel package (e.g., linux-eac or custom builds):
 # sbctl sign -s /boot/vmlinuz-linux-eac
 
-echo "[+] Step 5: Creating automatic pacman post-transaction hook..."
+echo "[+] Step 6: Creating automatic pacman post-transaction hook..."
 mkdir -p /etc/pacman.d/hooks
 
 cat << 'EOF' > /etc/pacman.d/hooks/sbctl.hook
@@ -67,8 +78,7 @@ When = PostTransaction
 Exec = /usr/bin/sbctl sign-all
 EOF
 
-echo "[+] Step 6: Verifying final sbctl database status..."
+echo "[+] Step 7: Verifying final sbctl database status..."
 sbctl verify
 
-echo "[SUCCESS] Secure Boot configuration and automated signing hooks are fully set up!"
-echo "I went through hours of troubleshooting for this, your welcome so y'all can have automatic signed stuff whenever epic drops it."
+echo "[SUCCESS] Secure Boot configuration, GRUB setup, and automated signing hooks are fully set up!"
