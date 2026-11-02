@@ -5,7 +5,7 @@
 # Key Objectives & Logic:
 # - Purpose: Enforces Secure Boot and TPM enablement for Easy Anti-Cheat V2 / Fortnite.
 # - Dynamic detection for signed kernels & key enrollment status using `sbctl`.
-# - Signs ALL bootloaders, kernels, and EFI binaries in /boot to prevent boot failure.
+# - Explicitly signs the exact GRUB binaries, bootloaders, and kernel found on your system.
 # ==============================================================================
 
 set -euo pipefail
@@ -95,46 +95,42 @@ check_and_sign_file() {
         return 0
     fi
 
+    log_info "Checking verification status for: $target_file"
     if sbctl verify "$target_file" &>/dev/null; then
         log_success "$target_file is already signed and valid."
     else
-        log_warn "$target_file is NOT signed. Signing EFI binary and saving to sbctl database..."
+        log_warn "$target_file is NOT signed. Signing and registering to sbctl database..."
         sbctl sign -s "$target_file" || log_warn "Failed to sign $target_file"
         log_success "$target_file has been successfully signed."
     fi
 }
 
 # ------------------------------------------------------------------------------
-# 3. Comprehensive EFI & Kernel Signing Loop
+# 3. Comprehensive GRUB, Kernel, and EFI Binary Signing Loop
 # ------------------------------------------------------------------------------
-log_info "Signing all detected bootloader, kernel, and EFI binaries..."
+log_info "Signing all required GRUB bootloaders, kernels, and EFI binaries..."
 
-# Explicit systemd-boot / GRUB targets
+# Explicit targets matching your system layout
 CRITICAL_TARGETS=(
     "/boot/vmlinuz-linux"
     "/boot/vmlinuz-linux-zen"
     "/boot/vmlinuz-linux-lts"
-    "/boot/EFI/systemd/systemd-bootx64.efi"
     "/boot/EFI/BOOT/BOOTX64.EFI"
-    "/boot/EFI/arch/grubx64.efi"
-    "/boot/EFI/Linux/*.efi"
+    "/boot/EFI/GRUB/grubx64.efi"
+    "/boot/grub/x86_64-efi/core.efi"
+    "/boot/grub/x86_64-efi/grub.efi"
 )
 
-for file in "${CRITICAL_TARGETS[@]}"; do
-    shopt -s nullglob
-    for target in $file; do
-        check_and_sign_file "$target"
-    done
-    shopt -u nullglob
+for target in "${CRITICAL_TARGETS[@]}"; do
+    check_and_sign_file "$target"
 done
 
-# Dynamic scan over /boot for any missed EFI executables
-log_info "Scanning /boot for additional unsigned EFI executables..."
-while IFS= read -r unsigned_file; do
-    if [[ -n "$unsigned_file" && -f "$unsigned_file" ]]; then
-        check_and_sign_file "$unsigned_file"
-    fi
-done < <(sbctl verify 2>/dev/null | grep -i "file is not signed" | awk '{print $NF}' || true)
+# Additional wildcard safety check across /boot for any missed files
+shopt -s nullglob
+for target in /boot/vmlinuz-* /boot/EFI/*/*.EFI; do
+    check_and_sign_file "$target"
+done
+shopt -u nullglob
 
 # ------------------------------------------------------------------------------
 # 4. Anti-Cheat (Fortnite / EAC V2) Parameters Placeholder
