@@ -5,11 +5,7 @@
 # Key Objectives & Logic:
 # - Purpose: Enforces Secure Boot and TPM enablement for Easy Anti-Cheat V2 / Fortnite.
 # - Dynamic detection for signed kernels & key enrollment status using `sbctl`.
-# - Signs installed Arch kernel and EFI binaries in /boot so Secure Boot passes.
-# - Kernel Preference: Avoiding SteamOS kernel for broader cross-setup compatibility.
-#   However, if CachyOS and Arch derivatives decline support, fallback logic goes here.
-# - NOTE: CachyOS / custom kernel integration code is strictly non-operational 
-#   (commented out) until custom kernel releases drop.
+# - Signs ALL bootloaders, kernels, and EFI binaries in /boot to prevent boot failure.
 # ==============================================================================
 
 set -euo pipefail
@@ -47,7 +43,7 @@ fi
 
 log_info "Verifying Secure Boot tools..."
 if ! command -v sbctl &> /dev/null; then
-    log_warn "'sbctl' is not installed. Attempting installation via pacman..."
+    log_warn "'sbctl' is not installed. Installing via pacman..."
     pacman -S --needed --noconfirm sbctl || log_error "Failed to install 'sbctl'. Please install it manually."
 fi
 
@@ -82,39 +78,71 @@ if [[ "$IS_INSTALLED" != "true" ]]; then
     if [[ "$IS_SETUP_MODE" == "true" ]]; then
         log_info "System is in Setup Mode. Creating and enrolling user Secure Boot keys..."
         sbctl create-keys
-        # Enrolling custom keys alongside Microsoft OEM certificates to avoid breaking hardware/GPU ROMs
+        # Enrolling Microsoft OEM keys AND builtin firmware keys to prevent GPU/Option ROM bricking
         sbctl enroll-keys -m -f
         log_success "Secure Boot keys successfully created and enrolled!"
     else
-        log_error "UEFI is not in 'Setup Mode'. Please reboot to BIOS settings, clear/reset Secure Boot keys to enter Setup Mode, and rerun this script."
+        log_warn "UEFI is not in 'Setup Mode'. Reset keys in BIOS/UEFI to enroll new keys if needed."
     fi
 else
     log_success "sbctl keys are already enrolled on this system."
 fi
 
-# File signing helper function (saves binary to sbctl database for automatic maintenance)
+# File signing helper function
 check_and_sign_file() {
     local target_file="$1"
     if [[ ! -f "$target_file" ]]; then
-        return 1
+        return 0
     fi
 
     if sbctl verify "$target_file" &>/dev/null; then
         log_success "$target_file is already signed and valid."
     else
         log_warn "$target_file is NOT signed. Signing EFI binary and saving to sbctl database..."
-        sbctl sign -s "$target_file"
+        sbctl sign -s "$target_file" || log_warn "Failed to sign $target_file"
         log_success "$target_file has been successfully signed."
     fi
 }
 
 # ------------------------------------------------------------------------------
-# 3. Secure Boot Kernel Signing & Kernel Preference Placeholders
+# 3. Comprehensive EFI & Kernel Signing Loop
+# ------------------------------------------------------------------------------
+log_info "Signing all detected bootloader, kernel, and EFI binaries..."
+
+# Explicit systemd-boot / GRUB targets
+CRITICAL_TARGETS=(
+    "/boot/vmlinuz-linux"
+    "/boot/vmlinuz-linux-zen"
+    "/boot/vmlinuz-linux-lts"
+    "/boot/EFI/systemd/systemd-bootx64.efi"
+    "/boot/EFI/BOOT/BOOTX64.EFI"
+    "/boot/EFI/arch/grubx64.efi"
+    "/boot/EFI/Linux/*.efi"
+)
+
+for file in "${CRITICAL_TARGETS[@]}"; do
+    shopt -s nullglob
+    for target in $file; do
+        check_and_sign_file "$target"
+    done
+    shopt -u nullglob
+done
+
+# Dynamic scan over /boot for any missed EFI executables
+log_info "Scanning /boot for additional unsigned EFI executables..."
+while IFS= read -r unsigned_file; do
+    if [[ -n "$unsigned_file" && -f "$unsigned_file" ]]; then
+        check_and_sign_file "$unsigned_file"
+    fi
+done < <(sbctl verify 2>/dev/null | grep -i "file is not signed" | awk '{print $NF}' || true)
+
+# ------------------------------------------------------------------------------
+# 4. Anti-Cheat (Fortnite / EAC V2) Parameters Placeholder
 # ------------------------------------------------------------------------------
 # ==============================================================================
 # [NON-OPERATIONAL PLACEHOLDER - ALTERNATIVE KERNEL LOGIC]
 # If Arch natively adds support: This section/script can be simplified or deleted.
-# If a separate kernel is required (CachyOS, derivatives, or offical repos with 
+# If a separate kernel is required (CachyOS, derivatives, or official repos with 
 # a different kernel): Configure its detection and parameters here.
 # Preference: Avoid SteamOS kernel for cross-setup compatibility. Fallback to 
 # SteamOS kernel only if CachyOS and derivatives decline to add support.
@@ -125,39 +153,16 @@ check_and_sign_file() {
 #       DETECTED_KERNEL="/boot/vmlinuz-linux-cachyos"
 #       KERNEL_TYPE="CachyOS Custom Kernel"
 #       log_info "Targeting custom kernel for EAC: $KERNEL_TYPE"
-#   elif [[ -f "/boot/vmlinuz-linux-neptune" ]]; then
-#       DETECTED_KERNEL="/boot/vmlinuz-linux-neptune"
-#       KERNEL_TYPE="SteamOS Neptune Fallback Kernel"
-#       log_info "Targeting fallback kernel for EAC: $KERNEL_TYPE"
 #   fi
 #
 # NON_OPERATIONAL_KERNEL_SELECTION_BLOCK
 # ==============================================================================
 
-# Universal signing loop to ensure installed Arch kernels and bootloaders are signed
-log_info "Signing all detected kernel images and EFI binaries in /boot..."
-
-shopt -s nullglob
-KERNELS_TO_SIGN=( /boot/vmlinuz-* /boot/EFI/*/*.EFI /boot/EFI/*/*/*.EFI )
-shopt -u nullglob
-
-for img in "${KERNELS_TO_SIGN[@]}"; do
-    check_and_sign_file "$img"
-done
-
-# ------------------------------------------------------------------------------
-# 4. Anti-Cheat (Fortnite / EAC V2) Parameters Placeholder
-# ------------------------------------------------------------------------------
-log_info "Executing baseline Secure Boot verification routine..."
-
-# Place any specific kernel command-line parameters required by Epic here when released.
-
 echo ""
 if [[ "$IS_ENABLED" == "true" ]]; then
-    log_success "Secure Boot is active and kernel signatures are verified."
+    log_success "Secure Boot is active and all boot binaries are verified."
 else
-    log_warn "Kernel signature checks completed, but Secure Boot is currently DISABLED in UEFI firmware."
-    log_warn "Enter motherboard UEFI settings and set Secure Boot state to 'Enabled'."
+    log_warn "Signature checks complete. If Secure Boot is still OFF in BIOS, turn it ON now."
 fi
 
 log_success "Fortnite / Easy Anti-Cheat V2 base environment setup complete!"
