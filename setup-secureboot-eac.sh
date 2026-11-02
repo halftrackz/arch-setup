@@ -9,12 +9,20 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-echo "[+] Step 1: Unlocking EFI variables (clearing immutable flags if present)..."
+echo "[+] Step 1: Checking and installing sbctl if missing..."
+if ! pacman -Qi sbctl &>/dev/null; then
+  echo "[+] sbctl is not installed. Installing via pacman..."
+  pacman -S --noconfirm sbctl
+else
+  echo "[+] sbctl is already installed."
+fi
+
+echo "[+] Step 2: Unlocking EFI variables (clearing immutable flags if present)..."
 chattr -i /sys/firmware/efi/efivars/PK-* 2>/dev/null || true
 chattr -i /sys/firmware/efi/efivars/KEK-* 2>/dev/null || true
 chattr -i /sys/firmware/efi/efivars/db-* 2>/dev/null || true
 
-echo "[+] Step 2: Checking Secure Boot Setup Mode state..."
+echo "[+] Step 3: Checking Secure Boot Setup Mode state..."
 SB_STATUS=$(sbctl status | grep "Setup Mode" | awk '{print $3}')
 
 if [ "$SB_STATUS" = "Disabled" ] || [ "$SB_STATUS" = "false" ]; then
@@ -27,38 +35,57 @@ else
   echo "[+] Setup Mode is verified as Enabled. Proceeding with key enrollment..."
 fi
 
-echo "[+] Step 3: Creating and enrolling custom Secure Boot keys..."
+echo "[+] Step 4: Creating and enrolling custom Secure Boot keys..."
 sbctl create-keys || true
-sbctl enroll-keys --microsoft || true # fallback or standard enrollment
+sbctl enroll-keys || true
 
-echo "[+] Step 4: Cleaning NVRAM fallback entries and reinstalling GRUB..."
-# Clear out fallback UEFI OS entry if it exists to prevent boot conflicts
+echo "[+] Step 5: Cleaning NVRAM stale fallback entries..."
 fallback_boot=$(efibootmgr | grep "UEFI OS" | awk '{print $1}' | tr -d '*')
 if [ -n "$fallback_boot" ]; then
-  boot_num=$(echo "$fallback_boot" | sed 's/Boot//')
-  efibootmgr -b "$boot_num" -B || true
+  for boot_item in $fallback_boot; do
+    boot_num=$(echo "$boot_item" | sed 's/Boot//')
+    efibootmgr -b "$boot_num" -B || true
+  done
 fi
 
-# Reinstall GRUB with shim verification disabled and TPM module included
+grub_boot=$(efibootmgr | grep "GRUB" | awk '{print $1}' | tr -d '*')
+if [ -n "$grub_boot" ]; then
+  for boot_item in $grub_boot; do
+    boot_num=$(echo "$boot_item" | sed 's/Boot//')
+    efibootmgr -b "$boot_num" -B || true
+  done
+fi
+
+echo "[+] Step 6: Reinstalling GRUB with shim verification bypassed and TPM support..."
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB --modules="tpm" --disable-shim-lock
 
-echo "[+] Step 5: Ensuring all boot binaries and kernels are signed..."
-sbctl sign -s /boot/EFI/GRUB/grubx64.efi
-sbctl sign -s /boot/grub/x86_64-efi/core.efi
-sbctl sign -s /boot/grub/x86_64-efi/grub.efi
-sbctl sign -s /boot/vmlinuz-linux
+echo "[+] Step 7: Dynamically signing all local boot binaries, kernels, microcode, and initramfs files..."
+# Sign GRUB core and EFI binaries
+[ -f /boot/EFI/GRUB/grubx64.efi ] && sbctl sign -s /boot/EFI/GRUB/grubx64.efi
+[ -f /boot/grub/x86_64-efi/core.efi ] && sbctl sign -s /boot/grub/x86_64-efi/core.efi
+[ -f /boot/grub/x86_64-efi/grub.efi ] && sbctl sign -s /boot/grub/x86_64-efi/grub.efi
+
+# Loop and sign all standard and custom kernels
+for kernel in /boot/vmlinuz-*; do
+  [ -f "$kernel" ] && sbctl sign -s "$kernel"
+done
+
+# Loop and sign all initramfs images
+for initramfs in /boot/initramfs-*.img; do
+  [ -f "$initramfs" ] && sbctl sign -s "$initramfs"
+done
+
+# Loop and sign CPU microcode files (intel-ucode, amd-ucode)
+for ucode in /boot/*-ucode.img; do
+  [ -f "$ucode" ] && sbctl sign -s "$ucode"
+done
 
 # --- Alternative / Separate Custom Kernels (Uncomment when installed) ---
-# CachyOS Kernel:
 # sbctl sign -s /boot/vmlinuz-linux-cachyos
-#
-# SteamOS / Valve custom kernel build:
 # sbctl sign -s /boot/vmlinuz-linux-neptune
-#
-# Separate custom kernel package (e.g., linux-eac or custom builds):
 # sbctl sign -s /boot/vmlinuz-linux-eac
 
-echo "[+] Step 6: Creating automatic pacman post-transaction hook..."
+echo "[+] Step 8: Creating automatic pacman post-transaction hook..."
 mkdir -p /etc/pacman.d/hooks
 
 cat << 'EOF' > /etc/pacman.d/hooks/sbctl.hook
@@ -70,15 +97,14 @@ Target = grub
 # Target = linux-cachyos
 # Target = linux-neptune
 # Target = linux-eac
-# Note: Add target here if using a separate custom kernel package or if Arch maintainers provide an auto-hook package in the future
 
 [Action]
-Description = Automatically signing EFI binaries for Secure Boot...
+Description = Automatically signing EFI binaries and boot files for Secure Boot...
 When = PostTransaction
 Exec = /usr/bin/sbctl sign-all
 EOF
 
-echo "[+] Step 7: Verifying final sbctl database status..."
+echo "[+] Step 9: Verifying final sbctl database status..."
 sbctl verify
 
-echo "[SUCCESS] Secure Boot configuration, GRUB setup, and automated signing hooks are fully set up!"
+echo "[SUCCESS] sbctl installation, Secure Boot configuration, GRUB setup, and dynamic signing loops are fully set up!"
