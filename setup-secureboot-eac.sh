@@ -59,11 +59,12 @@ fi
 echo "[+] Step 6: Reinstalling GRUB with shim verification bypassed and TPM support..."
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB --modules="tpm" --disable-shim-lock
 
-echo "[+] Step 7: Dynamically signing all local boot binaries, kernels, microcode, and initramfs files..."
-# Sign GRUB core and EFI binaries
+echo "[+] Step 7: Dynamically signing all local boot binaries, fallback bootloaders, and kernels..."
+# Sign GRUB core, EFI binaries, and fallback bootloader
 [ -f /boot/EFI/GRUB/grubx64.efi ] && sbctl sign -s /boot/EFI/GRUB/grubx64.efi
 [ -f /boot/grub/x86_64-efi/core.efi ] && sbctl sign -s /boot/grub/x86_64-efi/core.efi
 [ -f /boot/grub/x86_64-efi/grub.efi ] && sbctl sign -s /boot/grub/x86_64-efi/grub.efi
+[ -f /boot/EFI/BOOT/BOOTX64.EFI ] && sbctl sign -s /boot/EFI/BOOT/BOOTX64.EFI
 
 # Loop and sign all standard and custom kernels
 for kernel in /boot/vmlinuz-*; do
@@ -105,6 +106,6 @@ Exec = /usr/bin/sbctl sign-all
 EOF
 
 echo "[+] Step 9: Verifying final sbctl database status..."
-sbctl verify
+sudo sbctl verify
 
-echo "[SUCCESS] sbctl installation, Secure Boot configuration, GRUB setup, and dynamic signing loops are fully set up!"
+echo "[SUCCESS] All binaries, fallback loaders, and kernels are signed and verified!"
