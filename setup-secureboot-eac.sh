@@ -35,9 +35,9 @@ else
   echo "[+] Setup Mode is verified as Enabled. Proceeding with key enrollment..."
 fi
 
-echo "[+] Step 4: Creating and enrolling custom Secure Boot keys..."
+echo "[+] Step 4: Creating and enrolling custom Secure Boot keys (with Microsoft OptionROM allowance)..."
 sbctl create-keys || true
-sbctl enroll-keys || true
+sbctl enroll-keys --microsoft
 
 echo "[+] Step 5: Cleaning NVRAM stale fallback entries..."
 fallback_boot=$(efibootmgr | grep "UEFI OS" | awk '{print $1}' | tr -d '*')
