@@ -59,26 +59,17 @@ fi
 echo "[+] Step 6: Reinstalling GRUB with shim verification bypassed and TPM support..."
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB --modules="tpm" --disable-shim-lock
 
-echo "[+] Step 7: Dynamically signing all local boot binaries, fallback bootloaders, and kernels..."
-# Sign GRUB core, EFI binaries, and fallback bootloader
+echo "[+] Step 7: Signing valid EFI binaries and kernels..."
 [ -f /boot/EFI/GRUB/grubx64.efi ] && sbctl sign -s /boot/EFI/GRUB/grubx64.efi
 [ -f /boot/grub/x86_64-efi/core.efi ] && sbctl sign -s /boot/grub/x86_64-efi/core.efi
 [ -f /boot/grub/x86_64-efi/grub.efi ] && sbctl sign -s /boot/grub/x86_64-efi/grub.efi
 [ -f /boot/EFI/BOOT/BOOTX64.EFI ] && sbctl sign -s /boot/EFI/BOOT/BOOTX64.EFI
 
-# Loop and sign all standard and custom kernels
+# Sign all kernels safely
 for kernel in /boot/vmlinuz-*; do
-  [ -f "$kernel" ] && sbctl sign -s "$kernel"
-done
-
-# Loop and sign all initramfs images
-for initramfs in /boot/initramfs-*.img; do
-  [ -f "$initramfs" ] && sbctl sign -s "$initramfs"
-done
-
-# Loop and sign CPU microcode files (intel-ucode, amd-ucode)
-for ucode in /boot/*-ucode.img; do
-  [ -f "$ucode" ] && sbctl sign -s "$ucode"
+  if [ -f "$kernel" ]; then
+    sbctl sign -s "$kernel"
+  fi
 done
 
 # --- Alternative / Separate Custom Kernels (Uncomment when installed) ---
@@ -100,12 +91,12 @@ Target = grub
 # Target = linux-eac
 
 [Action]
-Description = Automatically signing EFI binaries and boot files for Secure Boot...
+Description = Automatically signing EFI binaries and kernels for Secure Boot...
 When = PostTransaction
 Exec = /usr/bin/sbctl sign-all
 EOF
 
 echo "[+] Step 9: Verifying final sbctl database status..."
-sudo sbctl verify
+sbctl verify
 
-echo "[SUCCESS] All binaries, fallback loaders, and kernels are signed and verified!"
+echo "[SUCCESS] Secure Boot configuration, GRUB setup, and signing are fully complete!"
