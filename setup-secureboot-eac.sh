@@ -10,8 +10,9 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 FLAG_FILE="/etc/hasranbefore/true.txt"
+BACKUP_DIR="/etc/hasranbefore"
 
-# Core function to write presets, build UKIs, set up custom top-priority generator, and regenerate GRUB
+# Core function to write presets, build UKIs, move 10_linux to the flag folder, set up 05_custom, and regenerate GRUB
 apply_configs_and_rebuild() {
   echo "[+] Checking NVIDIA GPU and proprietary driver configuration..."
   read -p "[?] Do you have an NVIDIA GPU with proprietary drivers installed? [y/N]: " nvidia_choice
@@ -37,9 +38,15 @@ apply_configs_and_rebuild() {
   sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=5/' /etc/default/grub 2>/dev/null || echo "GRUB_TIMEOUT=5" >> /etc/default/grub
   sed -i 's/^#\?GRUB_DISABLE_OS_PROBER=.*/GRUB_DISABLE_OS_PROBER=false/' /etc/default/grub 2>/dev/null || echo "GRUB_DISABLE_OS_PROBER=false" >> /etc/default/grub
 
-  # Ensure default 10_linux is restored and executable so standard kernel entries don't break
+  # Ensure backup directory exists
+  mkdir -p "$BACKUP_DIR"
+
+  # Move 10_linux into the flag folder directory as 10_linux.bak so GRUB ignores it completely
   if [ -f /etc/grub.d/10_linux ]; then
-    chmod +x /etc/grub.d/10_linux
+    echo "[+] Moving /etc/grub.d/10_linux to $BACKUP_DIR/10_linux.bak..."
+    mv /etc/grub.d/10_linux "$BACKUP_DIR/10_linux.bak"
+  elif [ -f "$BACKUP_DIR/10_linux.bak" ]; then
+    echo "[+] $BACKUP_DIR/10_linux.bak already exists. Skipping move."
   fi
 
   echo "[+] Overwriting /etc/mkinitcpio.d/linux.preset with correct UKI paths..."
@@ -61,36 +68,43 @@ EOF
   echo "[+] Generating UKI bundles via mkinitcpio..."
   mkinitcpio -P
 
+  # Extract exact kernel version dynamically for the GRUB menu entries
+  KERNEL_VERSION=$(pacman -Q linux | awk '{print $2}')
+  echo "[+] Detected kernel version: $KERNEL_VERSION"
+
   echo "[+] Reinstalling GRUB with shim verification bypassed and TPM support..."
   grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB --modules="tpm" --disable-shim-lock
 
-  # Clean up old conflicting custom scripts
-  rm -f /etc/grub.d/40_custom /etc/grub.d/41_custom
+  # Clean up old conflicting custom files
+  rm -f /etc/grub.d/40_custom /etc/grub.d/41_custom /etc/grub.d/05_custom_uki
 
-  echo "[+] Creating top-priority custom GRUB generator script in /etc/grub.d/05_custom_uki..."
-  cat << 'EOF' > /etc/grub.d/05_custom_uki
+  echo "[+] Creating clean top-priority custom GRUB script in /etc/grub.d/05_custom..."
+  cat << EOF > /etc/grub.d/05_custom
 #!/bin/sh
-exec tail -n +3 $0
+exec tail -n +3 \$0
 
-cat << 'EOF'
+cat << 'GBE'
 menuentry 'Arch Linux' --class arch --class gnu-linux --class gnu --class os {
     insmod efi_gop
+    echo "Booting Arch Linux..."
     chainloader /EFI/Linux/arch-linux.efi
 }
 
-submenu 'Advanced options for Arch Linux' $menuentry_id_option 'gnulinux-advanced' {
-    menuentry 'Arch Linux, with Linux linux' --class arch --class gnu-linux --class gnu --class os {
+submenu 'Advanced options for Arch Linux' \$menuentry_id_option 'gnulinux-advanced' {
+    menuentry 'Arch Linux, with Linux $KERNEL_VERSION' --class arch --class gnu-linux --class gnu --class os {
         insmod efi_gop
+        echo "Booting Arch Linux ($KERNEL_VERSION)..."
         chainloader /EFI/Linux/arch-linux.efi
     }
-    menuentry 'Arch Linux, with Linux linux (recovery mode)' --class arch --class gnu-linux --class gnu --class os {
+    menuentry 'Arch Linux, with Linux $KERNEL_VERSION (recovery mode)' --class arch --class gnu-linux --class gnu --class os {
         insmod efi_gop
+        echo "Booting Recovery Arch Kernel!"
         chainloader /EFI/Linux/arch-linux-fallback.efi
     }
 }
+GBE
 EOF
-EOF
-  chmod +x /etc/grub.d/05_custom_uki
+  chmod +x /etc/grub.d/05_custom
 
   echo "[+] Updating main GRUB configuration..."
   grub-mkconfig -o /boot/grub/grub.cfg
@@ -99,7 +113,7 @@ EOF
   mkdir -p /etc/pacman.d/hooks
   HOOK_FILE="/etc/pacman.d/hooks/sbctl.hook"
 
-  read -r -d '' EXPECTED_HOOK << 'EOF' || true
+  read -r -d '' EXPECTED_HOOK << 'HOOKEOF' || true
 [Trigger]
 Operation = Upgrade
 Type = Package
@@ -111,7 +125,7 @@ Target = mkinitcpio
 Description = Automatically rebuilding UKIs and signing EFI binaries for Secure Boot...
 When = PostTransaction
 Exec = /bin/sh -c 'mkinitcpio -P && sbctl sign-all && grub-mkconfig -o /boot/grub/grub.cfg'
-EOF
+HOOKEOF
 
   if [ -f "$HOOK_FILE" ] && [ "$(cat "$HOOK_FILE")" = "$EXPECTED_HOOK" ]; then
     echo "[+] Pacman hook already exists and matches. Skipping recreation."
@@ -127,9 +141,9 @@ if [ -f "$FLAG_FILE" ]; then
   read -p "[?] Do you only want to update/fix GRUB and UKIs without re-enrolling keys or signing? [y/N]: " choice
   case "$choice" in 
     y|Y )
-      echo "[+] Running quick update: verifying UKI presets, menu entries, and GRUB (skipping key signing)..."
+      echo "[+] Running quick update: verifying UKI presets, 10_linux folder backup, 05_custom menu, and GRUB..."
       apply_configs_and_rebuild
-      echo "[SUCCESS] UKI presets, top-priority generator, and bootloader have been verified and updated successfully!"
+      echo "[SUCCESS] UKI presets, menu entries, and bootloader have been updated successfully!"
       exit 0
       ;;
     * )
@@ -151,39 +165,17 @@ chattr -i /sys/firmware/efi/efivars/PK-* 2>/dev/null || true
 chattr -i /sys/firmware/efi/efivars/KEK-* 2>/dev/null || true
 chattr -i /sys/firmware/efi/efivars/db-* 2>/dev/null || true
 
-echo "[+] Step 3: Checking Secure Boot Setup Mode state..."
 SB_STATUS=$(sbctl status | grep "Setup Mode" | awk '{print $3}')
-
 if [ "$SB_STATUS" = "Disabled" ] || [ "$SB_STATUS" = "false" ]; then
   echo "[-] ERROR: Setup Mode is currently disabled in your motherboard's NVRAM."
-  echo "[-] To enroll keys, you must reboot into your BIOS, navigate to Secure Boot,"
-  echo "[-] and choose the option to reset/clear Secure Boot keys to enter 'Setup Mode'."
-  echo "[-] Once you boot back into Arch in Setup Mode, re-run this script."
   exit 1
 else
   echo "[+] Setup Mode is verified as Enabled. Proceeding with key enrollment..."
 fi
 
-echo "[+] Step 4: Creating and enrolling custom Secure Boot keys (with Microsoft OptionROM allowance)..."
+echo "[+] Step 4: Creating and enrolling custom Secure Boot keys..."
 sbctl create-keys || true
 sbctl enroll-keys --microsoft
-
-echo "[+] Step 5: Cleaning NVRAM stale fallback entries..."
-fallback_boot=$(efibootmgr | grep "UEFI OS" | awk '{print $1}' | tr -d '*')
-if [ -n "$fallback_boot" ]; then
-  for boot_item in $fallback_boot; do
-    boot_num=$(echo "$boot_item" | sed 's/Boot//')
-    efibootmgr -b "$boot_num" -B || true
-  done
-fi
-
-grub_boot=$(efibootmgr | grep "GRUB" | awk '{print $1}' | tr -d '*')
-if [ -n "$grub_boot" ]; then
-  for boot_item in $grub_boot; do
-    boot_num=$(echo "$boot_item" | sed 's/Boot//')
-    efibootmgr -b "$boot_num" -B || true
-  done
-fi
 
 echo "[+] Step 6: Executing config setup, UKI builds, and GRUB deployment..."
 apply_configs_and_rebuild
@@ -194,11 +186,8 @@ echo "[+] Step 7: Signing generated UKI EFI binaries and bootloaders..."
 [ -f /boot/EFI/GRUB/grubx64.efi ] && sbctl sign -s /boot/EFI/GRUB/grubx64.efi
 [ -f /boot/grub/x86_64-efi/core.efi ] && sbctl sign -s /boot/grub/x86_64-efi/core.efi
 
-echo "[+] Step 8: Creating initial run flag file so future executions prompt..."
-mkdir -p /etc/hasranbefore
+echo "[+] Step 8: Creating initial run flag file..."
+mkdir -p "$BACKUP_DIR"
 echo "true" > "$FLAG_FILE"
 
-echo "[+] Step 9: Verifying final sbctl database status..."
-sbctl verify
-
-echo "[SUCCESS] Complete setup, key enrollment, UKI generation, and top-priority GRUB menu setup are complete!"
+echo "[SUCCESS] Complete setup, key enrollment, UKI generation, and GRUB custom menu setup are complete!"
