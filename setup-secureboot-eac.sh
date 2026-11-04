@@ -68,45 +68,41 @@ EOF
   echo "[+] Generating UKI bundles via mkinitcpio..."
   mkinitcpio -P
 
-  # Extract exact kernel version dynamically for the GRUB menu entries
-  KERNEL_VERSION=$(pacman -Q linux | awk '{print $2}')
-  echo "[+] Detected kernel version: $KERNEL_VERSION"
-
   echo "[+] Reinstalling GRUB with shim verification bypassed and TPM support..."
   grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB --modules="tpm" --disable-shim-lock
 
   # Clean up old conflicting custom files
   rm -f /etc/grub.d/40_custom /etc/grub.d/41_custom /etc/grub.d/05_custom_uki
 
-  echo "[+] Creating clean top-priority custom GRUB script in /etc/grub.d/05_custom with faked loading sequence..."
-  cat << EOF > /etc/grub.d/05_custom
+  echo "[+] Creating clean top-priority custom GRUB script in /etc/grub.d/05_custom..."
+  cat << 'EOF' > /etc/grub.d/05_custom
 #!/bin/sh
-exec tail -n +3 \$0
+exec tail -n +3 $0
 
-cat << 'GBE'
+cat << 'EOF'
 menuentry 'Arch Linux' --class arch --class gnu-linux --class gnu --class os {
     insmod efi_gop
     echo "Booting 'Arch Linux'"
     sleep 1
-    echo "Loading Linux linux ..."
+    echo "Loading Linux, linux ..."
     sleep 1
     echo "Loading initial ramdisk ..."
     sleep 1
     chainloader /EFI/Linux/arch-linux.efi
 }
 
-submenu 'Advanced options for Arch Linux' \$menuentry_id_option 'gnulinux-advanced' {
-    menuentry 'Arch Linux, with Linux $KERNEL_VERSION' --class arch --class gnu-linux --class gnu --class os {
+submenu 'Advanced options for Arch Linux' $menuentry_id_option 'gnulinux-advanced' {
+    menuentry 'Arch Linux, with Linux linux' --class arch --class gnu-linux --class gnu --class os {
         insmod efi_gop
         echo "Booting 'Arch Linux'"
         sleep 1
-        echo "Loading Linux linux $KERNEL_VERSION ..."
+        echo "Loading Linux, linux ..."
         sleep 1
         echo "Loading initial ramdisk ..."
         sleep 1
         chainloader /EFI/Linux/arch-linux.efi
     }
-    menuentry 'Arch Linux, with Linux $KERNEL_VERSION (recovery mode)' --class arch --class gnu-linux --class gnu --class os {
+    menuentry 'Arch Linux, with Linux linux (recovery mode)' --class arch --class gnu-linux --class gnu --class os {
         insmod efi_gop
         echo "Booting 'Arch Linux'"
         sleep 1
@@ -117,7 +113,7 @@ submenu 'Advanced options for Arch Linux' \$menuentry_id_option 'gnulinux-advanc
         chainloader /EFI/Linux/arch-linux-fallback.efi
     }
 }
-GBE
+EOF
 EOF
   chmod +x /etc/grub.d/05_custom
 
@@ -158,7 +154,7 @@ if [ -f "$FLAG_FILE" ]; then
     y|Y )
       echo "[+] Running quick update: verifying UKI presets, backup, 05_custom menu, and GRUB..."
       apply_configs_and_rebuild
-      echo "[SUCCESS] UKI presets, faked loading animation steps, and GRUB have been updated successfully!"
+      echo "[SUCCESS] UKI presets, static loading messages, and GRUB have been updated successfully!"
       exit 0
       ;;
     * )
