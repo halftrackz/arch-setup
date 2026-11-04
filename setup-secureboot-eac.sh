@@ -30,8 +30,17 @@ apply_configs_and_rebuild() {
   CURRENT_CMDLINE=$(grep "^GRUB_CMDLINE_LINUX_DEFAULT=" /etc/default/grub 2>/dev/null | cut -d'"' -f2 || true)
   if [[ "$CURRENT_CMDLINE" != *"nvidia-drm.modeset=1"* ]] && [ -n "$EXTRA_PARAMS" ]; then
     NEW_CMDLINE="${CURRENT_CMDLINE}${EXTRA_PARAMS}"
-    sed -i "s|^GRUB_DISABLE_SUBMENU=.*|GRUB_DISABLE_SUBMENU=false|" /etc/default/grub 2>/dev/null || true
     sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"${NEW_CMDLINE}\"|" /etc/default/grub
+  fi
+
+  # Set clean timeout to 5 seconds and enable os-prober for Windows
+  sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=5/' /etc/default/grub 2>/dev/null || echo "GRUB_TIMEOUT=5" >> /etc/default/grub
+  sed -i 's/^#\?GRUB_DISABLE_OS_PROBER=.*/GRUB_DISABLE_OS_PROBER=false/' /etc/default/grub 2>/dev/null || echo "GRUB_DISABLE_OS_PROBER=false" >> /etc/default/grub
+
+  # Disable default 10_linux script so we don't get duplicate/default entries cluttering the menu
+  if [ -x /etc/grub.d/10_linux ]; then
+    echo "[+] Disabling default 10_linux script to prevent duplicate entries..."
+    chmod -x /etc/grub.d/10_linux
   fi
 
   echo "[+] Overwriting /etc/mkinitcpio.d/linux.preset with correct UKI paths..."
@@ -50,7 +59,7 @@ PRESETS=('default' 'fallback')
 #default_config="/etc/mkinitcpio.conf"
 #default_image="/boot/initramfs-linux.img"
 default_uki="/boot/EFI/Linux/arch-linux.efi"
-#default_options="--splash /usr/share/systemd/bootctl/splash-arch.bmp"
+default_options="--splash /usr/share/systemd/bootctl/splash-arch.bmp"
 
 #fallback_config="/etc/mkinitcpio.conf"
 ##fallback_image="/boot/initramfs-linux-fallback.img"
