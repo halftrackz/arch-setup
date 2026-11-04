@@ -11,7 +11,7 @@ fi
 
 FLAG_FILE="/etc/hasranbefore/true.txt"
 
-# Core function to write presets, build UKIs, update 10_linux generator, and regenerate GRUB
+# Core function to write presets, build UKIs, set up custom top-priority generator, and regenerate GRUB
 apply_configs_and_rebuild() {
   echo "[+] Checking NVIDIA GPU and proprietary driver configuration..."
   read -p "[?] Do you have an NVIDIA GPU with proprietary drivers installed? [y/N]: " nvidia_choice
@@ -37,6 +37,11 @@ apply_configs_and_rebuild() {
   sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=5/' /etc/default/grub 2>/dev/null || echo "GRUB_TIMEOUT=5" >> /etc/default/grub
   sed -i 's/^#\?GRUB_DISABLE_OS_PROBER=.*/GRUB_DISABLE_OS_PROBER=false/' /etc/default/grub 2>/dev/null || echo "GRUB_DISABLE_OS_PROBER=false" >> /etc/default/grub
 
+  # Ensure default 10_linux is restored and executable so standard kernel entries don't break
+  if [ -f /etc/grub.d/10_linux ]; then
+    chmod +x /etc/grub.d/10_linux
+  fi
+
   echo "[+] Overwriting /etc/mkinitcpio.d/linux.preset with correct UKI paths..."
   mkdir -p /boot/EFI/Linux
 
@@ -45,18 +50,10 @@ apply_configs_and_rebuild() {
 
 ALL_config="/etc/mkinitcpio.conf"
 ALL_kver="/boot/vmlinuz-linux"
-#ALL_kerneldest="/boot/vmlinuz-linux"
 
-#PRESETS=('default')
 PRESETS=('default' 'fallback')
 
-#default_config="/etc/mkinitcpio.conf"
-#default_image="/boot/initramfs-linux.img"
 default_uki="/boot/EFI/Linux/arch-linux.efi"
-#default_options="--splash /usr/share/systemd/bootctl/splash-arch.bmp"
-
-#fallback_config="/etc/mkinitcpio.conf"
-##fallback_image="/boot/initramfs-linux-fallback.img"
 fallback_uki="/boot/EFI/Linux/arch-linux-fallback.efi"
 fallback_options="-S autodetect"
 EOF
@@ -67,15 +64,15 @@ EOF
   echo "[+] Reinstalling GRUB with shim verification bypassed and TPM support..."
   grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB --modules="tpm" --disable-shim-lock
 
-  # Clean up old custom scripts to prevent any duplicate menu bloat
-  rm -f /etc/grub.d/05_custom_uki /etc/grub.d/40_custom
+  # Clean up old conflicting custom scripts
+  rm -f /etc/grub.d/40_custom /etc/grub.d/41_custom
 
-  echo "[+] Overwriting /etc/grub.d/10_linux with custom UKI menu entries..."
-  cat << 'EOF' > /etc/grub.d/10_linux
+  echo "[+] Creating top-priority custom GRUB generator script in /etc/grub.d/05_custom_uki..."
+  cat << 'EOF' > /etc/grub.d/05_custom_uki
 #!/bin/sh
 exec tail -n +3 $0
 
-cat << 'GBE'
+cat << 'EOF'
 menuentry 'Arch Linux' --class arch --class gnu-linux --class gnu --class os {
     insmod efi_gop
     chainloader /EFI/Linux/arch-linux.efi
@@ -91,9 +88,9 @@ submenu 'Advanced options for Arch Linux' $menuentry_id_option 'gnulinux-advance
         chainloader /EFI/Linux/arch-linux-fallback.efi
     }
 }
-GBE
 EOF
-  chmod +x /etc/grub.d/10_linux
+EOF
+  chmod +x /etc/grub.d/05_custom_uki
 
   echo "[+] Updating main GRUB configuration..."
   grub-mkconfig -o /boot/grub/grub.cfg
@@ -132,7 +129,7 @@ if [ -f "$FLAG_FILE" ]; then
     y|Y )
       echo "[+] Running quick update: verifying UKI presets, menu entries, and GRUB (skipping key signing)..."
       apply_configs_and_rebuild
-      echo "[SUCCESS] UKI presets, 10_linux custom generator, and bootloader have been verified and updated successfully!"
+      echo "[SUCCESS] UKI presets, top-priority generator, and bootloader have been verified and updated successfully!"
       exit 0
       ;;
     * )
@@ -204,4 +201,4 @@ echo "true" > "$FLAG_FILE"
 echo "[+] Step 9: Verifying final sbctl database status..."
 sbctl verify
 
-echo "[SUCCESS] Complete setup, key enrollment, UKI generation, and 10_linux GRUB menu setup are complete!"
+echo "[SUCCESS] Complete setup, key enrollment, UKI generation, and top-priority GRUB menu setup are complete!"
