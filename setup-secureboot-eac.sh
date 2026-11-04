@@ -80,7 +80,6 @@ PRESETEOF
 cat << 'EOF'
 menuentry 'Arch Linux' --class arch --class gnu-linux --class gnu --class os {
     insmod efi_gop
-    echo "Booting 'Arch Linux'"
     echo "Loading Linux, linux ..."
     echo "Loading initial ramdisk ..."
     chainloader /EFI/Linux/arch-linux.efi
@@ -89,14 +88,12 @@ menuentry 'Arch Linux' --class arch --class gnu-linux --class gnu --class os {
 submenu 'Advanced options for Arch Linux' {
     menuentry 'Arch Linux, with Linux linux' --class arch --class gnu-linux --class gnu --class os {
         insmod efi_gop
-        echo "Booting 'Arch Linux'"
         echo "Loading Linux, linux ..."
         echo "Loading initial ramdisk ..."
         chainloader /EFI/Linux/arch-linux.efi
     }
     menuentry 'Arch Linux, with Linux linux (recovery mode)' --class arch --class gnu-linux --class gnu --class os {
         insmod efi_gop
-        echo "Booting 'Arch Linux'"
         echo "Loading Recovery Arch Kernel!"
         echo "Loading initial ramdisk ..."
         chainloader /EFI/Linux/arch-linux-fallback.efi
