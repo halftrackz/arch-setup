@@ -52,7 +52,7 @@ apply_configs_and_rebuild() {
   echo "[+] Overwriting /etc/mkinitcpio.d/linux.preset with correct UKI paths..."
   mkdir -p /boot/EFI/Linux
 
-  cat << 'EOF' > /etc/mkinitcpio.d/linux.preset
+  cat << 'PRESETEOF' > /etc/mkinitcpio.d/linux.preset
 # mkinitcpio preset file for the 'linux' package
 
 ALL_config="/etc/mkinitcpio.conf"
@@ -63,7 +63,7 @@ PRESETS=('default' 'fallback')
 default_uki="/boot/EFI/Linux/arch-linux.efi"
 fallback_uki="/boot/EFI/Linux/arch-linux-fallback.efi"
 fallback_options="-S autodetect"
-EOF
+PRESETEOF
 
   echo "[+] Generating UKI bundles via mkinitcpio..."
   mkinitcpio -P
@@ -75,46 +75,35 @@ EOF
   rm -f /etc/grub.d/40_custom /etc/grub.d/41_custom /etc/grub.d/05_custom_uki
 
   echo "[+] Creating clean top-priority custom GRUB script in /etc/grub.d/05_custom..."
-  cat << 'EOF' > /etc/grub.d/05_custom
+  cat << 'OUTEREOF' > /etc/grub.d/05_custom
 #!/bin/sh
-exec tail -n +3 $0
-
 cat << 'EOF'
 menuentry 'Arch Linux' --class arch --class gnu-linux --class gnu --class os {
     insmod efi_gop
     echo "Booting 'Arch Linux'"
-    sleep 1
     echo "Loading Linux, linux ..."
-    sleep 1
     echo "Loading initial ramdisk ..."
-    sleep 1
     chainloader /EFI/Linux/arch-linux.efi
 }
 
-submenu 'Advanced options for Arch Linux' $menuentry_id_option 'gnulinux-advanced' {
+submenu 'Advanced options for Arch Linux' {
     menuentry 'Arch Linux, with Linux linux' --class arch --class gnu-linux --class gnu --class os {
         insmod efi_gop
         echo "Booting 'Arch Linux'"
-        sleep 1
         echo "Loading Linux, linux ..."
-        sleep 1
         echo "Loading initial ramdisk ..."
-        sleep 1
         chainloader /EFI/Linux/arch-linux.efi
     }
     menuentry 'Arch Linux, with Linux linux (recovery mode)' --class arch --class gnu-linux --class gnu --class os {
         insmod efi_gop
         echo "Booting 'Arch Linux'"
-        sleep 1
         echo "Loading Recovery Arch Kernel!"
-        sleep 1
         echo "Loading initial ramdisk ..."
-        sleep 1
         chainloader /EFI/Linux/arch-linux-fallback.efi
     }
 }
 EOF
-EOF
+OUTEREOF
   chmod +x /etc/grub.d/05_custom
 
   echo "[+] Updating main GRUB configuration..."
@@ -196,6 +185,7 @@ echo "[+] Step 7: Signing generated UKI EFI binaries and bootloaders..."
 [ -f /boot/EFI/Linux/arch-linux-fallback.efi ] && sbctl sign -s /boot/EFI/Linux/arch-linux-fallback.efi
 [ -f /boot/EFI/GRUB/grubx64.efi ] && sbctl sign -s /boot/EFI/GRUB/grubx64.efi
 [ -f /boot/grub/x86_64-efi/core.efi ] && sbctl sign -s /boot/grub/x86_64-efi/core.efi
+[ -f /boot/grub/x86_64-efi/grub.efi ] && sbctl sign -s /boot/grub/x86_64-efi/grub.efi
 
 echo "[+] Step 8: Creating initial run flag file..."
 mkdir -p "$BACKUP_DIR"
