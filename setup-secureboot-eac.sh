@@ -65,6 +65,12 @@ fallback_uki="/boot/EFI/Linux/arch-linux-fallback.efi"
 fallback_options="-S autodetect"
 PRESETEOF
 
+  # Remove any conflicting sbctl bundle targeting the mkinitcpio UKI path (idempotent)
+  if sbctl bundle list 2>/dev/null | grep -q '/boot/EFI/Linux/arch-linux.efi'; then
+    echo "[+] Removing conflicting sbctl bundle for /boot/EFI/Linux/arch-linux.efi..."
+    sbctl remove-bundle /boot/EFI/Linux/arch-linux.efi
+  fi
+
   echo "[+] Generating UKI bundles via mkinitcpio..."
   mkinitcpio -P
 
@@ -107,6 +113,9 @@ OUTEREOF
   echo "[+] Updating main GRUB configuration..."
   grub-mkconfig -o /boot/grub/grub.cfg
 
+  echo "[+] Ensuring all tracked EFI binaries are signed..."
+  sbctl sign-all
+
   echo "[+] Ensuring automatic pacman post-transaction hook is up to date..."
   # add hook for cachyOS, so kernel updates on CachyOS automatically rebuild and re-sign its UKI.
   mkdir -p /etc/pacman.d/hooks
@@ -123,7 +132,7 @@ Target = mkinitcpio
 [Action]
 Description = Automatically rebuilding UKIs and signing EFI binaries for Secure Boot...
 When = PostTransaction
-Exec = /bin/sh -c 'mkinitcpio -P && sbctl sign-all && grub-mkconfig -o /boot/grub/grub.cfg'
+Exec = /bin/sh -c 'if sbctl bundle list 2>/dev/null | grep -q "/boot/EFI/Linux/arch-linux.efi"; then sbctl remove-bundle /boot/EFI/Linux/arch-linux.efi; fi && mkinitcpio -P && sbctl sign-all && grub-mkconfig -o /boot/grub/grub.cfg'
 HOOKEOF
 
   if [ -f "$HOOK_FILE" ] && [ "$(cat "$HOOK_FILE")" = "$EXPECTED_HOOK" ]; then
