@@ -65,9 +65,10 @@ fallback_uki="/boot/EFI/Linux/arch-linux-fallback.efi"
 fallback_options="-S autodetect"
 PRESETEOF
 
-  # Remove conflicting sbctl bundle targeting the mkinitcpio UKI path
+  # Remove conflicting sbctl bundles targeting the mkinitcpio UKI paths
   sbctl remove-bundle /boot/EFI/Linux/arch-linux.efi 2>/dev/null || true
-  echo "[+] Removed sbctl bundle for /boot/EFI/Linux/arch-linux.efi (if present)."
+  sbctl remove-bundle /boot/EFI/Linux/arch-linux-fallback.efi 2>/dev/null || true
+  echo "[+] Removed sbctl bundles for default and fallback UKIs (if present)."
 
   echo "[+] Generating UKI bundles via mkinitcpio..."
   mkinitcpio -P
