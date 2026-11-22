@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# Am adding cachyOS kernel soon whenever support is marked offical by epic games and list is open-sourced. 
 # Exit immediately if a command exits with a non-zero status
 set -e
 
@@ -51,7 +51,7 @@ apply_configs_and_rebuild() {
 
   echo "[+] Overwriting /etc/mkinitcpio.d/linux.preset with correct UKI paths..."
   mkdir -p /boot/EFI/Linux
-
+# double check cachyOS kernel is correct -- need to be sure otherwise everything will kaboom when trying to boot it.
   cat << 'PRESETEOF' > /etc/mkinitcpio.d/linux.preset
 # mkinitcpio preset file for the 'linux' package
 
@@ -75,6 +75,7 @@ PRESETEOF
   rm -f /etc/grub.d/40_custom /etc/grub.d/41_custom /etc/grub.d/05_custom_uki
 
   echo "[+] Creating clean top-priority custom GRUB script in /etc/grub.d/05_custom..."
+  # cachyOS needs its own menu entry, probably put below main options, then put advanced options below that so it is: Normal kernel ---> CachyOS kernel UKI ---> Advanced options for Arch Linux, with recovery options for both kernels
   cat << 'OUTEREOF' > /etc/grub.d/05_custom
 #!/bin/sh
 cat << 'EOF'
@@ -107,6 +108,7 @@ OUTEREOF
   grub-mkconfig -o /boot/grub/grub.cfg
 
   echo "[+] Ensuring automatic pacman post-transaction hook is up to date..."
+  # add hook for cachyOS, so kernel updates on CachyOS automatically rebuild and re-sign its UKI.
   mkdir -p /etc/pacman.d/hooks
   HOOK_FILE="/etc/pacman.d/hooks/sbctl.hook"
 
