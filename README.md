@@ -48,11 +48,11 @@ sudo bash setup_firewall.sh
 
 ## Nightly Updater
 
-place holder - will NOT be added until i feel like it lol
+This script schedules a nightly update on arch based distros at 4:30 AM local time, via system MD. You can change it by modifying the script your self, or just using AI if you are not comfortable with it. I will add actual instructions later.
 
 ## Secure Boot & Setup EAC
 
-place holder -- will add documentation when it is finished, but for now it just enables secure boot on the Arch kernel 
+This script is still not finished, but I now know that I will use CachyOS for EAC v2 Linux support on normal Arch, and it will sign your arch kernel too with your own keys. (it only signs the your arch kernel with your keys and deals with booting rn, but cachyOS kernel is planned to be added soon)
 
 ## Grub Script
 
