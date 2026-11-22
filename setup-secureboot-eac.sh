@@ -65,11 +65,9 @@ fallback_uki="/boot/EFI/Linux/arch-linux-fallback.efi"
 fallback_options="-S autodetect"
 PRESETEOF
 
-  # Remove any conflicting sbctl bundle targeting the mkinitcpio UKI path (idempotent)
-  if sbctl bundle list 2>/dev/null | grep -q '/boot/EFI/Linux/arch-linux.efi'; then
-    echo "[+] Removing conflicting sbctl bundle for /boot/EFI/Linux/arch-linux.efi..."
-    sbctl remove-bundle /boot/EFI/Linux/arch-linux.efi
-  fi
+  # Remove conflicting sbctl bundle targeting the mkinitcpio UKI path
+  sbctl remove-bundle /boot/EFI/Linux/arch-linux.efi 2>/dev/null || true
+  echo "[+] Removed sbctl bundle for /boot/EFI/Linux/arch-linux.efi (if present)."
 
   echo "[+] Generating UKI bundles via mkinitcpio..."
   mkinitcpio -P
@@ -116,12 +114,24 @@ OUTEREOF
   echo "[+] Ensuring all tracked EFI binaries are signed..."
   sbctl sign-all
 
-  echo "[+] Ensuring automatic pacman post-transaction hook is up to date..."
-  # add hook for cachyOS, so kernel updates on CachyOS automatically rebuild and re-sign its UKI.
-  mkdir -p /etc/pacman.d/hooks
+  # Remove old duplicate sbctl.hook only if it exists and matches the previous hook contents
   HOOK_FILE="/etc/pacman.d/hooks/sbctl.hook"
+  if [ -f "$HOOK_FILE" ]; then
+    read -r -d '' OLD_HOOK_V1 << 'HOOKV1EOF' || true
+[Trigger]
+Operation = Upgrade
+Type = Package
+Target = linux
+Target = grub
+Target = mkinitcpio
 
-  read -r -d '' EXPECTED_HOOK << 'HOOKEOF' || true
+[Action]
+Description = Automatically rebuilding UKIs and signing EFI binaries for Secure Boot...
+When = PostTransaction
+Exec = /bin/sh -c 'mkinitcpio -P && sbctl sign-all && grub-mkconfig -o /boot/grub/grub.cfg'
+HOOKV1EOF
+
+    read -r -d '' OLD_HOOK_V2 << 'HOOKV2EOF' || true
 [Trigger]
 Operation = Upgrade
 Type = Package
@@ -133,13 +143,13 @@ Target = mkinitcpio
 Description = Automatically rebuilding UKIs and signing EFI binaries for Secure Boot...
 When = PostTransaction
 Exec = /bin/sh -c 'if sbctl bundle list 2>/dev/null | grep -q "/boot/EFI/Linux/arch-linux.efi"; then sbctl remove-bundle /boot/EFI/Linux/arch-linux.efi; fi && mkinitcpio -P && sbctl sign-all && grub-mkconfig -o /boot/grub/grub.cfg'
-HOOKEOF
+HOOKV2EOF
 
-  if [ -f "$HOOK_FILE" ] && [ "$(cat "$HOOK_FILE")" = "$EXPECTED_HOOK" ]; then
-    echo "[+] Pacman hook already exists and matches. Skipping recreation."
-  else
-    echo "[+] Writing pacman post-transaction hook..."
-    echo "$EXPECTED_HOOK" > "$HOOK_FILE"
+    CURRENT_HOOK="$(cat "$HOOK_FILE")"
+    if [ "$CURRENT_HOOK" = "$OLD_HOOK_V1" ] || [ "$CURRENT_HOOK" = "$OLD_HOOK_V2" ]; then
+      echo "[+] Removing obsolete $HOOK_FILE..."
+      rm -f "$HOOK_FILE"
+    fi
   fi
 }
 
@@ -192,8 +202,8 @@ echo "[+] Step 7: Signing generated UKI EFI binaries and bootloaders..."
 [ -f /boot/EFI/Linux/arch-linux.efi ] && sbctl sign -s /boot/EFI/Linux/arch-linux.efi
 [ -f /boot/EFI/Linux/arch-linux-fallback.efi ] && sbctl sign -s /boot/EFI/Linux/arch-linux-fallback.efi
 [ -f /boot/EFI/GRUB/grubx64.efi ] && sbctl sign -s /boot/EFI/GRUB/grubx64.efi
-[ -f /boot/grub/x86_64-efi/core.efi ] && sbctl sign -s /boot/grub/x86_64-efi/core.efi
-[ -f /boot/grub/x86_64-efi/grub.efi ] && sbctl sign -s /boot/grub/x86_64-efi/grub.efi
+[ -f /boot/grub/x86_64-efi/core.efi ] && sbctl sign -s /boot/grub/x86_4-efi/core.efi
+[ -f /boot/grub/x86_4-efi/grub.efi ] && sbctl sign -s /boot/grub/x86_4-efi/grub.efi
 
 echo "[+] Step 8: Creating initial run flag file..."
 mkdir -p "$BACKUP_DIR"
