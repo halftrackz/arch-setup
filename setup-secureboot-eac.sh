@@ -14,6 +14,22 @@ BACKUP_DIR="/etc/hasranbefore"
 
 # Core function to write presets, build UKIs, move 10_linux to the flag folder, set up 05_custom, and regenerate GRUB
 apply_configs_and_rebuild() {
+  # Seed /etc/kernel/cmdline from /proc/cmdline if missing so mkinitcpio/pacman hooks have a clean cmdline
+  if [ ! -f /etc/kernel/cmdline ]; then
+    echo "[!] /etc/kernel/cmdline does not exist."
+    read -p "[?] Do you want to copy /proc/cmdline to /etc/kernel/cmdline just in case so pacman/mkinitcpio doesn't hit errors? [y/N]: " cmdline_choice
+    case "$cmdline_choice" in
+      y|Y )
+        mkdir -p /etc/kernel
+        sed -E 's/(^| )BOOT_IMAGE=[^ ]+//g; s/^ //; s/ $//' /proc/cmdline > /etc/kernel/cmdline
+        echo "[+] Wrote /etc/kernel/cmdline from /proc/cmdline (stripped BOOT_IMAGE= if present)."
+        ;;
+      * )
+        echo "[+] Skipping /etc/kernel/cmdline creation."
+        ;;
+    esac
+  fi
+
   echo "[+] Checking NVIDIA GPU and proprietary driver configuration..."
   read -p "[?] Do you have an NVIDIA GPU with proprietary drivers installed? [y/N]: " nvidia_choice
   EXTRA_PARAMS=""
